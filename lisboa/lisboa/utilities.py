@@ -100,11 +100,24 @@ def sphere2cart(r,azi,ele):
     return x,y,z
 
 
-def visualize_scan(file,sites):
+def visualize_scan(file: str,
+                   sites: str,
+                   epsilonx_str: str = 'epsilon1',
+                   epsilony_str: str = 'epsilon2'):
     '''
     Visualize scan with well-sampled regions.
     '''
-            
+    
+    #graphic inputs
+    labels={'epsilon1':r'$\epsilon_{I}',
+            'epsilon2':r'$\epsilon_{II}',
+            'epsilon3':r'$\epsilon_{III}',
+            'duration':r'$\tau_s'}
+    units={'epsilon1':'',
+            'epsilon2':'',
+            'epsilon3':'',
+            'duration':'s'}
+    
     fig=plt.figure(figsize=(18,10))
     if len(sites)>1:
         gs = GridSpec(nrows=len(sites)+1, ncols=2, width_ratios=[1, 2], figure=fig)
@@ -135,36 +148,26 @@ def visualize_scan(file,sites):
             info[s]=r'$\alpha='+str(np.round(azi[0],2))+':'+str(np.round(np.diff(azi)[0],2))+':'+str(np.round(azi[-1],2))+r'^\circ$'+ '\n'+\
                  r'$\beta=' +str(np.round(ele[0],2))+':'+str(np.round(np.diff(ele)[0],2))+':'+str(np.round(ele[-1],2))+r'^\circ$' + '\n'+\
                  r'$r= '    +str(np.round(r[0],2))  +':'+str(np.round(np.diff(r)[0],2))  +':'+str(np.round(r[-1],2))+ '$ m' +'\n'+\
-                 r'$\tau_s='+str(np.round(Data.attrs['duration'],1))+r'$ s'+ '\n'+\
+                 r'$\tau_s='+str(np.round(Data.attrs['duration'],2))+r'$ s'+ '\n'+\
                  'Scan mode = '+Data.attrs['mode']
      
         #common data
         Data=xr.open_dataset(file,group='synthesis',engine='netcdf4')
         
         #extract objective functions
-        epsilonx=Data.attrs['epsilon1']
-        if ~np.isnan(Data.attrs['epsilon3']):
-            epsilony=Data.attrs['epsilon3']
-            labely=r'$\epsilon_{III}'
-        else:
-            epsilony=Data.attrs['epsilon2']
-            labely=r'$\epsilon_{II}'
+        epsilonx=Data[epsilonx_str].values
+        epsilony=Data[epsilony_str].values
             
-        info['synthesis']= r'$\epsilon_I='+str(np.round(epsilonx,2))+r'$'                      + '\n'+\
-                                labely+'='+str(np.round(epsilony,2))+r'$'                   + '\n'+\
+        info['synthesis']= labels[epsilonx_str]+'='+str(np.round(epsilonx,2))+r'$ '+units[epsilonx_str]+'\n'+\
+                           labels[epsilony_str]+'='+str(np.round(epsilony,2))+r'$ '+units[epsilony_str]+'\n'+\
                            r'$\Delta n_0=['+ ", ".join(f"{v:.2f}" for v in Data.attrs['config_Dn0']) + "]"+r'$ m'                                        
     else:
         Data=xr.open_dataset(file,engine='netcdf4')
         
         #extract objective functions
-        epsilonx=Data.attrs.epsilon1
-        if ~np.isnan(Data.attrs.epsilon3):
-            epsilony=Data.attrs.epsilon3
-            labely=r'$\epsilon_{III}'
-        else:
-            epsilony=Data.attrs.epsilon2
-            labely=r'$\epsilon_{II}'
-            
+        epsilonx=Data.attrs[epsilonx_str]
+        epsilony=Data.attrs[epsilony_str]
+        
         p={}
         for c in Data.excl.coords:
             p[c]=Data[c+'_points']
@@ -177,9 +180,9 @@ def visualize_scan(file,sites):
              r'$\beta=' +str(np.round(ele[0],2))+':'+str(np.round(np.diff(ele)[0],2))+':'+str(np.round(ele[-1],2))+r'^\circ$' + '\n'+\
              r'$r= '    +str(np.round(r[0],2))  +':'+str(np.round(np.diff(r)[0],2))  +':'+str(np.round(r[-1],2))+ '$ m' +'\n'+\
              r'$\Delta n_0=['+ ", ".join(f"{v:.2f}" for v in Data.attrs['config_Dn0']) + "]"+r'$ m'                                         + '\n'+\
-             r'$\epsilon_I='+str(np.round(epsilonx,2))+r'$'                      + '\n'+\
-                  labely+'='+str(np.round(epsilony,2))+r'$'                   + '\n'+\
-             r'$\tau_s='+str(np.round(Data.attrs['duration'],1))+r'$ s'+ '\n'+\
+            labels[epsilonx_str]+'='+str(np.round(epsilonx,2))+r'$ '+units[epsilonx_str]+'\n'+\
+            labels[epsilony_str]+'='+str(np.round(epsilony,2))+r'$ '+units[epsilony_str]+'\n'+\
+             r'$\tau_s='+str(np.round(Data.attrs['duration'],2))+r'$ s'+ '\n'+\
              'Scan mode = '+Data.attrs['mode']
              
     coords=''
@@ -192,13 +195,15 @@ def visualize_scan(file,sites):
     for s in sites:
         ax_text = fig.add_subplot(gs[ctr, 0])
         ax_text.axis("off")
-        ax_text.text(0,0.9,s=info[s],color=colors[ctr],bbox={'edgecolor':'k','facecolor':(1,1,1,0.5)})
+        unique_info="\n".join(dict.fromkeys(info[s].splitlines()))
+        ax_text.text(0,0.9,s=unique_info,color=colors[ctr],bbox={'edgecolor':'k','facecolor':(1,1,1,0.5)})
         ctr+=1
         
     if len(sites)>1:
         ax_text = fig.add_subplot(gs[-1, 0])
         ax_text.axis("off")
-        ax_text.text(0,0.9,s=info['synthesis'],color='w',bbox={'edgecolor':'k','facecolor':'k'})
+        unique_info="\n".join(dict.fromkeys(info['synthesis'].splitlines()))
+        ax_text.text(0,0.9,s=unique_info,color='w',bbox={'edgecolor':'k','facecolor':'k'})
         
     #plot 2D scan
     if coords!='xyz':
@@ -273,18 +278,26 @@ def visualize_scan(file,sites):
         
     return fig
 
-def visualize_Pareto(Data):
+def visualize_Pareto(Data: xr.Dataset,
+                     epsilonx_str: str = 'epsilon1',
+                     epsilony_str: str = 'epsilon2'):
     
     #extract information
     num_ang=len(Data.index_ang)
     num_dang=len(Data.index_dang)
-    epsilonx=Data.epsilon1.values
-    if ~np.isnan(Data.epsilon3).any():
-        epsilony=Data.epsilon3.values
-        labely=r'$\epsilon_{III}$'
-    else:
-        epsilony=Data.epsilon2.values
-        labely=r'$\epsilon_{II}$'
+    epsilonx=Data[epsilonx_str].values
+    epsilony=Data[epsilony_str].values
+    
+    #graphic inputs
+    labels={'epsilon1':r'$\epsilon_{I}$',
+            'epsilon2':r'$\epsilon_{II}$',
+            'epsilon3':r'$\epsilon_{III}$',
+            'duration':r'$\tau_s$ [s]'}
+    
+    limits={'epsilon1':[0,1],
+            'epsilon2':[0,1],
+            'epsilon3':[0,1],
+            'duration':[0, np.nanmax(Data['duration'].values)]}
     
     #graphics
     cmap = plt.cm.jet
@@ -310,10 +323,10 @@ def visualize_Pareto(Data):
                         num_ele=Data.num_ele.sel(site=s).values
                         label+=s.values+': '+r'$num\alpha='+str(np.round(num_azi[i_dang],2))+r'$, $num\beta='+str(np.round(num_ele[i_dang],2))+r'$'+'\n'
                 plt.plot(epsilonx[i_ang,i_dang],epsilony[i_ang,i_dang],'.',color=colors[i_dang],markeredgecolor='k',markersize=30,label=label[:-1])
-            plt.xlim([0,1])
-            plt.ylim([0,1])
-            plt.xlabel(r'$\epsilon_I$')
-            plt.ylabel(r'$\epsilon_{II}$')  
+            plt.xlim(limits[epsilonx_str])
+            plt.ylim(limits[epsilony_str])
+            plt.xlabel(labels[epsilonx_str])
+            plt.ylabel(labels[epsilony_str])  
             title=''
             for s in Data.site:
                 azi1=Data.azi1.sel(site=s).values
@@ -347,10 +360,10 @@ def visualize_Pareto(Data):
                 elif 'num_azi' in Data:
                     label=r'$num_\alpha='+str(np.round(num_azi[i_dang],2))+r'$, $num_\beta='+str(np.round(num_ele[i_dang],2))+r'$'
                 plt.plot(epsilonx[i_ang,i_dang],epsilony[i_ang,i_dang],'.',color=colors[i_dang],markeredgecolor='k',markersize=30,label=label)
-            plt.xlim([0,1])
-            plt.ylim([0,1])
-            plt.xlabel(r'$\epsilon_I$')
-            plt.ylabel(labely)  
+            plt.xlim(limits[epsilonx_str])
+            plt.ylim(limits[epsilony_str])
+            plt.xlabel(labels[epsilonx_str])
+            plt.ylabel(labels[epsilony_str])  
             plt.title(r'$\alpha \in ['+str(np.round(azi1[i_ang],2))+', '+str(np.round(azi2[i_ang],2))+r']^\circ$, $\beta \in ['+str(np.round(ele1[i_ang],2))+', '+str(np.round(ele2[i_ang],2))+r']^\circ$')
             plt.grid()
     
